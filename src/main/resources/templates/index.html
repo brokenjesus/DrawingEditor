@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drawing Editor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        canvas { border: 1px solid black; margin-top: 10px; }
+    </style>
+</head>
+<body class="container mt-4">
+<div class="text-center mb-3">
+    <button onclick="showTab('lines')" class="btn btn-primary me-2">Линии</button>
+    <button onclick="showTab('curves')" class="btn btn-outline-primary">Кривые</button>
+    <input onclick="toggleDebug()" type="checkbox" id="debug_checkbox" class="btn btn-outline-primary">Debug</input>
+</div>
+
+<div id="lines" class="mb-3">
+    <select id="algorithm" class="form-select w-auto d-inline-block">
+        <option value="dda">DDA</option>
+        <option value="bresenham">Брезенхем</option>
+        <option value="wu">Ву</option>
+    </select>
+</div>
+
+<div id="curves" class="mb-3" style="display:none;">
+    <select id="curveType" class="form-select w-auto d-inline-block" onchange="updateInputs()">
+        <option value="circle">Окружность</option>
+        <option value="ellipse">Эллипс</option>
+        <option value="parabola">Парабола</option>
+        <option value="hyperbola">Гипербола</option>
+    </select>
+    <div id="params" class="mt-2">
+        <label class="form-label">Радиус (r):</label> <input id="param1" type="number" class="form-control w-auto d-inline-block" />
+    </div>
+    <button onclick="drawCurve()" style="color:white;" class="btn btn-success mt-2">Нарисовать</button>
+</div>
+
+<canvas id="canvas" width="1280" height="720" class="d-block mx-auto"></canvas>
+<p id="instruction" class="text-center mt-2">Кликните, чтобы выбрать начальную точку.</p>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sockjs-client/dist/sockjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/stompjs/lib/stomp.min.js"></script>
+<script>
+    const canvas = document.getElementById('canvas');
+    const context = canvas.getContext('2d');
+
+    // Подключение к WebSocket серверу через STOMP
+    const socket = new SockJS('/ws');
+    const stompClient = Stomp.over(socket);
+
+    stompClient.connect({}, function (frame) {
+        console.log('Connected: ' + frame);
+
+        // Подписка на канал для получения данных
+        stompClient.subscribe('/topic/drawings', function (message) {
+            const pixels = JSON.parse(message.body);
+            console.log('Received pixels:', pixels);
+            drawPixels(pixels); // Рисуем точки на canvas
+        });
+
+    }, function (error) {
+        console.error('WebSocket error: ', error);
+    });
+
+    // function convertToRGBA(color) {
+    //     // Extract RGBA components from the color object
+    //     const { red, green, blue, alpha } = color;
+    //
+    //     // Convert alpha (255-based) to a 0-1 range
+    //     const alphaNormalized = alpha / 255;
+    //
+    //     // Return the rgba color string
+    //     return `rgba(${red}, ${green}, ${blue}, ${alphaNormalized})`;
+    // }
+
+    async function drawPixels(pixels) {
+        // Сортируем пиксели по координатам (сначала по x, затем по y)
+        // pixels.sort((a, b) => a.x === b.x ? a.y - b.y : a.x - b.x);
+
+        // Проходим по отсортированным пикселям
+        for (let i = 0; i < pixels.length; i++) {
+            let pixel = pixels[i];
+            let color = pixel.color;
+            console.log(color);
+            context.fillStyle = pixel.color;
+
+            // Рисуем пиксель
+            context.fillRect(pixel.x, pixel.y, 1, 1);
+
+            // Если это не последний пиксель, проверяем расстояние
+            // if (i < pixels.length - 1) {
+            //     let nextPixel = pixels[i + 1];
+            //     let distance = Math.sqrt(Math.pow(nextPixel.x - pixel.x, 2) + Math.pow(nextPixel.y - pixel.y, 2));
+            //
+            //     // Если расстояние больше 1, рисуем линию между пикселями
+            //     if (distance > 1) {
+            //         drawLineBetweenPixels(pixel, nextPixel);
+            //         // drawLine(pixel.x, pixel.y, nextPixel.x, nextPixel.y);
+            //     }
+            // }
+
+            // В режиме отладки добавляем задержку
+            if (debug) {
+                await new Promise(resolve => setTimeout(resolve, 200)); // 200 ms delay
+                console.log(`(${pixel.x}, ${pixel.y}),(${pixel.color})`);
+            }
+        }
+    }
+
+    // Функция рисования линии между двумя пикселями
+    function drawLineBetweenPixels(pixel1, pixel2) {
+        const dx = pixel2.x - pixel1.x;
+        const dy = pixel2.y - pixel1.y;
+        const steps = Math.max(Math.abs(dx), Math.abs(dy));
+        const xIncrement = dx / steps;
+        const yIncrement = dy / steps;
+
+        let x = pixel1.x;
+        let y = pixel1.y;
+
+        for (let i = 0; i <= steps; i++) {
+            context.fillRect(Math.round(x), Math.round(y), 1, 1);
+            x += xIncrement;
+            y += yIncrement;
+        }
+    }
+
+
+    let activeTab = 'lines';
+    let start = null;
+    let center = null;
+    let debug = false;
+
+    function toggleDebug(){
+        debug = document.getElementById("debug_checkbox").checked;
+    }
+
+    function showTab(tabName) {
+        document.getElementById('lines').style.display = tabName === 'lines' ? 'block' : 'none';
+        document.getElementById('curves').style.display = tabName === 'curves' ? 'block' : 'none';
+        // Remove the active class and add the outline class for all buttons
+        document.querySelectorAll('button').forEach(button => {
+            button.classList.remove('btn-primary');
+            button.classList.add('btn-outline-primary');
+        });
+        // Add the active class for the selected tab
+        document.querySelector(`[onclick="showTab('${tabName}')"]`).classList.remove('btn-outline-primary');
+        document.querySelector(`[onclick="showTab('${tabName}')"]`).classList.add('btn-primary');
+        activeTab = tabName;
+    }
+
+
+    canvas.addEventListener('click', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        if (activeTab === 'lines') {
+            if (!start) {
+                start = {x, y};
+                document.getElementById('instruction').innerText = `Выберите конечную точку.`;
+            } else {
+                drawLine(start.x, start.y, x, y);
+                start = null;
+                document.getElementById('instruction').innerText = `Кликните, чтобы выбрать начальную точку.`;
+            }
+        } else if (activeTab === 'curves') {
+            center = {x, y};
+            document.getElementById('instruction').innerText = `Начальная точка: (${x}, ${y}). Введите параметры.`;
+        }
+    });
+
+    function updateInputs() {
+        const curveType = document.getElementById("curveType").value;
+        const paramsDiv = document.getElementById("params");
+        paramsDiv.innerHTML = '';
+
+        if (curveType === "circle") {
+            paramsDiv.innerHTML = `<label>Радиус (r):</label> <input id="param1" type="number" />`;
+        } else if (curveType === "ellipse" || curveType === "hyperbola") {
+            paramsDiv.innerHTML = `
+                <label>a:</label> <input id="param1" type="number" />
+                <label>b:</label> <input id="param2" type="number" />
+            `;
+        } else if (curveType === "parabola") {
+            paramsDiv.innerHTML = `<label>Фокус (a):</label> <input id="param1" type="number" />`;
+        }
+    }
+
+    function drawLine(x1, y1, x2, y2) {
+        const algorithm = document.getElementById("algorithm").value;
+        let pixels = [];
+
+        // Отправка запроса на сервер для рисования линии
+        console.log("log:", x1, y1, x2, y2, algorithm);
+        stompClient.send("/app/draw", {}, JSON.stringify({x1, y1, x2, y2, algorithm}));
+    }
+
+    function drawCurve() {
+        const curveType = document.getElementById("curveType").value;
+        const param1 = parseFloat(document.getElementById("param1").value);
+        const param2 = document.getElementById("param2") ? parseFloat(document.getElementById("param2").value) : null;
+
+        let pixels = [];
+
+        // Отправка запроса на сервер для рисования кривой
+        stompClient.send("/app/draw", {}, JSON.stringify({curveType, center, param1, param2}));
+    }
+</script>
+</body>
+</html>
