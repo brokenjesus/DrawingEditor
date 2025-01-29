@@ -164,10 +164,40 @@
                 document.getElementById('instruction').innerText = `Кликните, чтобы выбрать начальную точку.`;
             }
         } else if (activeTab === 'curves') {
+            // Выбрана начальная точка для кривой (центр)
             center = {x, y};
             document.getElementById('instruction').innerText = `Начальная точка: (${x}, ${y}). Введите параметры.`;
+
+            // Отображаем уравнение для выбранной кривой
+            const curveType = document.getElementById("curveType").value;
+            const param1 = parseFloat(document.getElementById("param1").value);
+            const param2 = document.getElementById("param2") ? parseFloat(document.getElementById("param2").value) : null;
+
+            let equation = '';
+
+            switch (curveType) {
+                case 'circle':
+                    equation = `(x - ${x})² + (y - ${y})² = ${param1 ** 2}`;
+                    break;
+                case 'ellipse':
+                    equation = `(x - ${x})² / ${param1 ** 2} + (y - ${y})² / ${param2 ** 2} = 1`;
+                    break;
+                case 'parabola':
+                    equation = `y - ${y} = ${param1}(x - ${x})²`;
+                    break;
+                case 'hyperbola':
+                    equation = `(x - ${x})² / ${param1 ** 2} - (y - ${y})² / ${param2 ** 2} = 1`;
+                    break;
+                default:
+                    alert("Неизвестный тип кривой");
+                    return;
+            }
+
+            // Выводим уравнение
+            document.getElementById('instruction').innerText = `Уравнение кривой: ${equation}`;
         }
     });
+
 
     function updateInputs() {
         const curveType = document.getElementById("curveType").value;
