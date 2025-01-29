@@ -93,80 +93,89 @@ public class CurveDrawingService {
     }
 
 
-    public List<Pixel> generateParabola(int x, int y, double a) {
+    public List<Pixel> generateParabola(int x0, int y0, double a) {
         List<Pixel> pixels = new ArrayList<>();
-        List<Pixel> parabolaPoints = new ArrayList<>();
 
-        // Вычисление максимального значения x, чтобы парабола не выходила за пределы высоты 720 пикселей
-        int maxX = (int) Math.sqrt(720 / Math.abs(a));  // Максимальное значение x для параболы, чтобы y не превышало 720
+        int xLimit = (int) Math.sqrt(720 / Math.abs(a)); // Оценка предела x по высоте 720
 
-        // Генерация точек параболы для всего диапазона
-        for (int i = -maxX; i < maxX+1; i++) {
-            int yPos = (int) (a * i * i);
-            parabolaPoints.add(new Pixel(x + i, y + yPos, "rgba(0, 0, 0, 255)"));
-        }
+        double div = 0.5 / a;
+        int x = 0, y = 0;
+        double dPre = 0.5 - a;
+        double dPost = 1 - a * Math.ceil(div) - 0.25 * a;
 
-        // Генерация линий между точками параболы
-        for (int i = 0; i < parabolaPoints.size() - 1; i++) {
-            int distance = (int) Math.sqrt(Math.pow(parabolaPoints.get(i + 1).getX() - parabolaPoints.get(i).getX(), 2) + Math.pow(parabolaPoints.get(i + 1).getY() - parabolaPoints.get(i).getY(), 2));
-            if (distance > 1) {
-                pixels.addAll(lineDrawingService.generateDDALine(parabolaPoints.get(i + 1).getX(), parabolaPoints.get(i + 1).getY(), parabolaPoints.get(i).getX(), parabolaPoints.get(i).getY()));
+        while (x <= xLimit) {
+            pixels.add(new Pixel(x + x0, y + y0, "rgba(0, 0, 0, 255)"));
+            pixels.add(new Pixel(-x + x0, y + y0, "rgba(0, 0, 0, 255)"));
+
+            if (x < div) {
+                double tmp = -2 * a * x - 3 * a;
+                x++;
+                if (dPre < 0) {
+                    y++;
+                    dPre += tmp + 1;
+                } else {
+                    dPre += tmp;
+                }
             } else {
-                pixels.add(parabolaPoints.get(i));
+                double tmp = -2 * a * x - 2 * a + 1;
+                y++;
+                if (dPost >= 0) {
+                    x++;
+                    dPost += tmp;
+                } else {
+                    dPost += 1;
+                }
+            }
+        }
+        return pixels;
+    }
+
+
+    public List<Pixel> generateHyperbola(int x0, int y0, double a, double b) {
+        List<Pixel> pixels = new ArrayList<>();
+
+        // Squared values of a and b
+        a = Math.pow(a, 2);
+        b = Math.pow(b, 2);
+
+        // Starting point
+        int x = (int) Math.abs(Math.sqrt(a));
+        int y = 0;
+
+        // Calculating the maximum x value
+        int xLimit = (int) (a * Math.sqrt(1 + Math.pow(720 / b, 2))); // Adjust based on screen height (720px)
+
+        // Initial decision variable
+        int d = (int) (b * (2 * x + 1) - a);
+
+        while (x <= xLimit) {
+            // Determine which region to move to
+            boolean f1 = (d <= 0) || (2 * d - b * (2 * x + 1) <= 0);
+            boolean f2 = (d <= 0) || (2 * d - a * (2 * y + 1) > 0);
+
+            // Add points for the four quadrants of the hyperbola
+            pixels.add(new Pixel(x0 - x, y0 - y, "rgba(0, 0, 0, 255)"));
+            pixels.add(new Pixel(x0 + x, y0 + y, "rgba(0, 0, 0, 255)"));
+            pixels.add(new Pixel(x0 + x, y0 - y, "rgba(0, 0, 0, 255)"));
+            pixels.add(new Pixel(x0 - x, y0 + y, "rgba(0, 0, 0, 255)"));
+
+            // Update x and y values depending on the region
+            if (f1) {
+                x++;
+            }
+            if (f2) {
+                y++;
+            }
+
+            // Update the decision variable
+            if (f1) {
+                d += b * (2 * x + 1);
+            }
+            if (f2) {
+                d -= a * (2 * y - 1);
             }
         }
 
         return pixels;
     }
-
-
-    public List<Pixel> generateHyperbola(int x, int y, double a, double b) {
-        List<Pixel> pixels = new ArrayList<>();
-        List<Pixel> positiveXBranch = new ArrayList<>();
-        List<Pixel> negativeXBranch = new ArrayList<>();
-
-
-        // Вычисление максимального значения x, чтобы гипербола не выходила за пределы экрана
-        int maxX = (int) (a * Math.sqrt(1 + Math.pow(720 / b, 2))); // Максимальное значение x для гиперболы, чтобы y не превышало 720
-
-        for (float i = 0; i < maxX; i+=0.2) {
-            if (Math.abs(i) > a) {
-                double yPos1 = b * Math.sqrt((i * i) / (a * a) - 1); // positiveY(top) sub-branch
-                double yPos2 = -yPos1; //  negativeY(bottom) sub-branch
-                //positiveX(right) branch
-                positiveXBranch.add(new Pixel((int) (x + i), y + (int) yPos1, "rgba(0, 0, 0, 255)"));
-                positiveXBranch.add(new Pixel((int) (x + i), y + (int) yPos2, "rgba(0, 0, 0, 255)"));
-
-                //negativeX(left) branch
-                negativeXBranch.add(new Pixel((int) (x - i), y + (int) yPos1, "rgba(0, 0, 0, 255)"));
-                negativeXBranch.add(new Pixel((int) (x - i), y + (int) yPos2, "rgba(0, 0, 0, 255)"));
-            }
-        }
-
-        for (int i = 0; i < positiveXBranch.size() - 1; i++) {
-            int distance = (int) Math.sqrt(Math.pow(positiveXBranch.get(i + 1).getX() - positiveXBranch.get(i).getX(), 2) + Math.pow(positiveXBranch.get(i + 1).getY() - positiveXBranch.get(i).getY(), 2));
-            if (distance > 1) {
-//                pixels.addAll(lineDrawingService.generateDDALine(positiveXBranch.get(i + 1).getX(), positiveXBranch.get(i + 1).getY(), positiveXBranch.get(i).getX(), positiveXBranch.get(i).getY()));
-//                pixels.addAll(lineDrawingService.generateDDALine(negativeXBranch.get(i + 1).getX(), negativeXBranch.get(i + 1).getY(), negativeXBranch.get(i).getX(), negativeXBranch.get(i).getY()));
-                pixels.add(positiveXBranch.get(i));
-                pixels.add(negativeXBranch.get(i));
-            } else {
-                pixels.add(positiveXBranch.get(i));
-                pixels.add(negativeXBranch.get(i));
-            }
-        }
-
-//        // Генерация точек гиперболы для отрицательных x
-//        for (int i = 0; i < maxX; i++) { // Только для отрицательных x
-//            if (Math.abs(i) > a) {
-//                double yPos1 = b * Math.sqrt((i * i) / (a * a) - 1); // Положительная ветвь
-//                double yPos2 = -yPos1; // Отрицательная ветвь
-//                pixels.add(new Pixel(x - i, y + (int) yPos1, "rgba(0, 0, 0, 255)"));
-//                pixels.add(new Pixel(x - i, y + (int) yPos2, "rgba(0, 0, 0, 255)"));
-//            }
-//        }
-
-        return pixels;
-    }
-
 }

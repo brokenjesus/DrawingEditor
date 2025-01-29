@@ -11,16 +11,18 @@
 </head>
 <body class="container mt-4">
 <div class="text-center mb-3">
+<!--    <button onclick="enableEraser()" class="btn btn-outline-danger">Ластик</button>-->
     <button onclick="showTab('lines')" class="btn btn-primary me-2">Линии</button>
     <button onclick="showTab('curves')" class="btn btn-outline-primary">Кривые</button>
     <input onclick="toggleDebug()" type="checkbox" id="debug_checkbox" class="btn btn-outline-primary">Debug</input>
+    <button onclick="clearCanvas()" style="color:white;" class="btn btn-danger ms-2">Очистить</button>
 </div>
 
 <div id="lines" class="mb-3">
     <select id="algorithm" class="form-select w-auto d-inline-block">
         <option value="dda">DDA</option>
-        <option value="bresenham">Брезенхем</option>
-        <option value="wu">Ву</option>
+        <option value="bresenham">Bresenham</option>
+        <option value="wu">Wu</option>
     </select>
 </div>
 
@@ -65,66 +67,60 @@
         console.error('WebSocket error: ', error);
     });
 
-    // function convertToRGBA(color) {
-    //     // Extract RGBA components from the color object
-    //     const { red, green, blue, alpha } = color;
-    //
-    //     // Convert alpha (255-based) to a 0-1 range
-    //     const alphaNormalized = alpha / 255;
-    //
-    //     // Return the rgba color string
-    //     return `rgba(${red}, ${green}, ${blue}, ${alphaNormalized})`;
-    // }
+    let eraserEnabled = false;
 
-    async function drawPixels(pixels) {
-        // Сортируем пиксели по координатам (сначала по x, затем по y)
-        // pixels.sort((a, b) => a.x === b.x ? a.y - b.y : a.x - b.x);
-
-        // Проходим по отсортированным пикселям
-        for (let i = 0; i < pixels.length; i++) {
-            let pixel = pixels[i];
-            let color = pixel.color;
-            console.log(color);
-            context.fillStyle = pixel.color;
-
-            // Рисуем пиксель
-            context.fillRect(pixel.x, pixel.y, 1, 1);
-
-            // Если это не последний пиксель, проверяем расстояние
-            // if (i < pixels.length - 1) {
-            //     let nextPixel = pixels[i + 1];
-            //     let distance = Math.sqrt(Math.pow(nextPixel.x - pixel.x, 2) + Math.pow(nextPixel.y - pixel.y, 2));
-            //
-            //     // Если расстояние больше 1, рисуем линию между пикселями
-            //     if (distance > 1) {
-            //         drawLineBetweenPixels(pixel, nextPixel);
-            //         // drawLine(pixel.x, pixel.y, nextPixel.x, nextPixel.y);
-            //     }
-            // }
-
-            // В режиме отладки добавляем задержку
-            if (debug) {
-                await new Promise(resolve => setTimeout(resolve, 200)); // 200 ms delay
-                console.log(`(${pixel.x}, ${pixel.y}),(${pixel.color})`);
-            }
-        }
+    function enableEraser() {
+        eraserEnabled = true;
+        document.getElementById('lines').style.display = 'none';
+        document.getElementById('curves').style.display = 'none';
+        document.getElementById('instruction').innerText = 'Используйте мышь для стирания.';
     }
 
-    // Функция рисования линии между двумя пикселями
-    function drawLineBetweenPixels(pixel1, pixel2) {
-        const dx = pixel2.x - pixel1.x;
-        const dy = pixel2.y - pixel1.y;
-        const steps = Math.max(Math.abs(dx), Math.abs(dy));
-        const xIncrement = dx / steps;
-        const yIncrement = dy / steps;
+    canvas.addEventListener('mousedown', (e) => {
+        if (eraserEnabled) {
+            canvas.addEventListener('mousemove', erase);
+        }
+    });
 
-        let x = pixel1.x;
-        let y = pixel1.y;
+    canvas.addEventListener('mouseup', () => {
+        if (eraserEnabled) {
+            canvas.removeEventListener('mousemove', erase);
+        }
+    });
 
-        for (let i = 0; i <= steps; i++) {
-            context.fillRect(Math.round(x), Math.round(y), 1, 1);
-            x += xIncrement;
-            y += yIncrement;
+    function erase(e) {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const eraserSize = parseInt(document.getElementById('eraserSize').value) || 10;
+
+        context.clearRect(x - eraserSize / 2, y - eraserSize / 2, eraserSize, eraserSize);
+    }
+
+    function clearCanvas() {
+        context.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    async function drawPixels(pixels) {
+        for (let i = 0; i < pixels.length; i++) {
+            let pixel = pixels[i];
+            let originalColor = pixel.color;
+
+            if (debug) {
+                // Сначала рисуем пиксель красным цветом
+                context.fillStyle = 'red';
+                context.fillRect(pixel.x, pixel.y, 1, 1);
+                await new Promise(resolve => setTimeout(resolve, 200)); // Задержка 200 мс
+
+                // Затем заменяем его на исходный цвет
+                context.fillStyle = originalColor;
+                context.fillRect(pixel.x, pixel.y, 1, 1);
+                console.log(`(${pixel.x}, ${pixel.y}) -> ${originalColor}`);
+            } else {
+                // Рисуем пиксель обычным цветом, если режим отладки отключён
+                context.fillStyle = originalColor;
+                context.fillRect(pixel.x, pixel.y, 1, 1);
+            }
         }
     }
 
