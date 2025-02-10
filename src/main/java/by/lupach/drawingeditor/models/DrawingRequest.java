@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.awt.*;
+import java.util.List;
 
 @Data
 @Setter
@@ -15,4 +16,6 @@ public class DrawingRequest {
     private String curveType; // For curve types
     private Point center;
     private Double param1, param2;
+
+    private List<Pixel> points; //For interpolation/approximation
 }

@@ -85,14 +85,14 @@ public class LineDrawingService {
         int xPxl1 = (int) roundedStartX;
         int yPxl1 = (int) Math.floor(initialY);
 
-        addPixel(pixels, xPxl1, yPxl1, initialY, isSteep);
+        wuHelperAddPixel(pixels, xPxl1, yPxl1, initialY, isSteep);
 
         float yPosition = initialY + gradient;
 
         // Draw intermediate points
         for (int x = xPxl1 + 1; x <= x2; x++) {
             int yPxl = (int) Math.floor(yPosition);
-            addPixel(pixels, x, yPxl, yPosition, isSteep);
+            wuHelperAddPixel(pixels, x, yPxl, yPosition, isSteep);
             yPosition += gradient;
         }
 
@@ -100,12 +100,12 @@ public class LineDrawingService {
         float roundedEndX = Math.round(x2);
         int endXPixel = (int) roundedEndX;
         int endYPixel = (int) Math.floor(yPosition);
-        addPixel(pixels, endXPixel, endYPixel, yPosition, isSteep);
+        wuHelperAddPixel(pixels, endXPixel, endYPixel, yPosition, isSteep);
 
         return pixels;
     }
 
-    private void addPixel(List<Pixel> pixels, int x, int y, float position, boolean isSteep) {
+    private void wuHelperAddPixel(List<Pixel> pixels, int x, int y, float position, boolean isSteep) {
         if (isSteep) {
             pixels.add(new Pixel(y, x, "rgba(0, 0, 0," + rfPart(position) + ")"));
             pixels.add(new Pixel(y + 1, x, "rgba(0, 0, 0," + fPart(position) + ")"));

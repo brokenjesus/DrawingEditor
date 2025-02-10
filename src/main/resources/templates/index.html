@@ -11,13 +11,14 @@
 </head>
 <body class="container mt-4">
 <div class="text-center mb-3">
-<!--    <button onclick="enableEraser()" class="btn btn-outline-danger">Ластик</button>-->
+    <!-- <button onclick="enableEraser()" class="btn btn-outline-danger">Ластик</button> -->
     <button onclick="showTab('lines')" class="btn btn-primary me-2">Линии</button>
     <button onclick="showTab('curves')" class="btn btn-outline-primary">Кривые</button>
     <input onclick="toggleDebug()" type="checkbox" id="debug_checkbox" class="btn btn-outline-primary">Debug</input>
     <button onclick="clearCanvas()" style="color:white;" class="btn btn-danger ms-2">Очистить</button>
 </div>
 
+<!-- Панель для линий -->
 <div id="lines" class="mb-3">
     <select id="algorithm" class="form-select w-auto d-inline-block">
         <option value="dda">DDA</option>
@@ -26,21 +27,28 @@
     </select>
 </div>
 
+<!-- Панель для кривых -->
 <div id="curves" class="mb-3" style="display:none;">
     <select id="curveType" class="form-select w-auto d-inline-block" onchange="updateInputs()">
         <option value="circle">Окружность</option>
         <option value="ellipse">Эллипс</option>
         <option value="parabola">Парабола</option>
         <option value="hyperbola">Гипербола</option>
+        <!-- Новые алгоритмы -->
+        <option value="hermite">Hermite</option>
+        <option value="bezier">Bezier</option>
+        <option value="bspline">BSpline</option>
     </select>
     <div id="params" class="mt-2">
-        <label class="form-label">Радиус (r):</label> <input id="param1" type="number" class="form-control w-auto d-inline-block" />
+        <!-- Для circle/ellipse и т.п. – стандартные параметры -->
+        <label class="form-label">Радиус (r):</label>
+        <input id="param1" type="number" class="form-control w-auto d-inline-block" />
     </div>
     <button onclick="drawCurve()" style="color:white;" class="btn btn-success mt-2">Нарисовать</button>
 </div>
 
 <canvas id="canvas" width="1280" height="720" class="d-block mx-auto"></canvas>
-<p id="instruction" class="text-center mt-2">Кликните, чтобы выбрать начальную точку.</p>
+<p id="instruction" class="text-center mt-2">Кликните, чтобы выбрать точку.</p>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sockjs-client/dist/sockjs.min.js"></script>
@@ -49,52 +57,40 @@
     const canvas = document.getElementById('canvas');
     const context = canvas.getContext('2d');
 
-    // Подключение к WebSocket серверу через STOMP
+    // Подключение к WebSocket через STOMP
     const socket = new SockJS('/ws');
     const stompClient = Stomp.over(socket);
 
     stompClient.connect({}, function (frame) {
         console.log('Connected: ' + frame);
-
-        // Подписка на канал для получения данных
         stompClient.subscribe('/topic/drawings', function (message) {
             const pixels = JSON.parse(message.body);
             console.log('Received pixels:', pixels);
-            drawPixels(pixels); // Рисуем точки на canvas
+            drawPixels(pixels);
         });
-
     }, function (error) {
         console.error('WebSocket error: ', error);
     });
 
-    let eraserEnabled = false;
+    let debug = false;
+    let activeTab = 'lines';
+    let start = null;       // для линий
+    let center = null;      // для кривых с центром
+    let curvePoints = [];   // для кривых-интерполяций (hermite, bezier, bspline)
 
-    function enableEraser() {
-        eraserEnabled = true;
-        document.getElementById('lines').style.display = 'none';
-        document.getElementById('curves').style.display = 'none';
-        document.getElementById('instruction').innerText = 'Используйте мышь для стирания.';
+    function toggleDebug(){
+        debug = document.getElementById("debug_checkbox").checked;
     }
 
-    canvas.addEventListener('mousedown', (e) => {
-        if (eraserEnabled) {
-            canvas.addEventListener('mousemove', erase);
-        }
-    });
-
-    canvas.addEventListener('mouseup', () => {
-        if (eraserEnabled) {
-            canvas.removeEventListener('mousemove', erase);
-        }
-    });
-
-    function erase(e) {
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        const eraserSize = parseInt(document.getElementById('eraserSize').value) || 10;
-
-        context.clearRect(x - eraserSize / 2, y - eraserSize / 2, eraserSize, eraserSize);
+    function showTab(tabName) {
+        document.getElementById('lines').style.display = tabName === 'lines' ? 'block' : 'none';
+        document.getElementById('curves').style.display = tabName === 'curves' ? 'block' : 'none';
+        activeTab = tabName;
+        // Сброс начальных точек
+        start = null;
+        center = null;
+        curvePoints = [];
+        document.getElementById('instruction').innerText = 'Кликните, чтобы выбрать точку.';
     }
 
     function clearCanvas() {
@@ -105,135 +101,106 @@
         for (let i = 0; i < pixels.length; i++) {
             let pixel = pixels[i];
             let originalColor = pixel.color;
-
             if (debug) {
-                // Сначала рисуем пиксель красным цветом
                 context.fillStyle = 'red';
                 context.fillRect(pixel.x, pixel.y, 1, 1);
-                await new Promise(resolve => setTimeout(resolve, 200)); // Задержка 200 мс
-
-                // Затем заменяем его на исходный цвет
-                context.fillStyle = originalColor;
-                context.fillRect(pixel.x, pixel.y, 1, 1);
-                console.log(`(${pixel.x}, ${pixel.y}) -> ${originalColor}`);
-            } else {
-                // Рисуем пиксель обычным цветом, если режим отладки отключён
-                context.fillStyle = originalColor;
-                context.fillRect(pixel.x, pixel.y, 1, 1);
+                await new Promise(resolve => setTimeout(resolve, 50));
             }
+            context.fillStyle = originalColor;
+            context.fillRect(pixel.x, pixel.y, 1, 1);
         }
     }
 
-
-    let activeTab = 'lines';
-    let start = null;
-    let center = null;
-    let debug = false;
-
-    function toggleDebug(){
-        debug = document.getElementById("debug_checkbox").checked;
+    function updateInputs() {
+        const curveType = document.getElementById("curveType").value;
+        const paramsDiv = document.getElementById("params");
+        // Для кривых с центром и параметрами (circle, ellipse, parabola, hyperbola)
+        if (curveType === "circle") {
+            paramsDiv.innerHTML = `<label>Радиус (r):</label> <input id="param1" type="number" class="form-control w-auto d-inline-block" />`;
+            center = null;
+        } else if (curveType === "ellipse" || curveType === "hyperbola") {
+            paramsDiv.innerHTML = `
+          <label>a:</label> <input id="param1" type="number" class="form-control w-auto d-inline-block" />
+          <label>b:</label> <input id="param2" type="number" class="form-control w-auto d-inline-block" />
+        `;
+            center = null;
+        } else if (curveType === "parabola") {
+            paramsDiv.innerHTML = `<label>Фокус (a):</label> <input id="param1" type="number" class="form-control w-auto d-inline-block" />`;
+            center = null;
+        }
+        // Для алгоритмов интерполяции/аппроксимации – накапливаем точки
+        else if (curveType === "hermite" || curveType === "bezier" || curveType === "bspline") {
+            paramsDiv.innerHTML = `<p>Кликните по canvas для добавления точек.<br>
+          Для Hermite: минимум 2 точки.<br>
+          Для Bezier: число точек должно быть 4 или 4 + 3k.<br>
+          Для BSpline: минимум 4 точки.</p>`;
+            // Очищаем массив точек
+            curvePoints = [];
+        }
     }
-
-    function showTab(tabName) {
-        document.getElementById('lines').style.display = tabName === 'lines' ? 'block' : 'none';
-        document.getElementById('curves').style.display = tabName === 'curves' ? 'block' : 'none';
-        // Remove the active class and add the outline class for all buttons
-        document.querySelectorAll('button').forEach(button => {
-            button.classList.remove('btn-primary');
-            button.classList.add('btn-outline-primary');
-        });
-        // Add the active class for the selected tab
-        document.querySelector(`[onclick="showTab('${tabName}')"]`).classList.remove('btn-outline-primary');
-        document.querySelector(`[onclick="showTab('${tabName}')"]`).classList.add('btn-primary');
-        activeTab = tabName;
-    }
-
 
     canvas.addEventListener('click', (e) => {
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-
         if (activeTab === 'lines') {
             if (!start) {
-                start = {x, y};
-                document.getElementById('instruction').innerText = `Выберите конечную точку.`;
+                start = { x, y };
+                document.getElementById('instruction').innerText = 'Выберите конечную точку.';
             } else {
                 drawLine(start.x, start.y, x, y);
                 start = null;
-                document.getElementById('instruction').innerText = `Кликните, чтобы выбрать начальную точку.`;
+                document.getElementById('instruction').innerText = 'Кликните, чтобы выбрать начальную точку.';
             }
         } else if (activeTab === 'curves') {
-            // Выбрана начальная точка для кривой (центр)
-            center = {x, y};
-            document.getElementById('instruction').innerText = `Начальная точка: (${x}, ${y}). Введите параметры.`;
-
-            // Отображаем уравнение для выбранной кривой
             const curveType = document.getElementById("curveType").value;
-            const param1 = parseFloat(document.getElementById("param1").value);
-            const param2 = document.getElementById("param2") ? parseFloat(document.getElementById("param2").value) : null;
-
-            let equation = '';
-
-            switch (curveType) {
-                case 'circle':
-                    equation = `(x - ${x})² + (y - ${y})² = ${param1 ** 2}`;
-                    break;
-                case 'ellipse':
-                    equation = `(x - ${x})² / ${param1 ** 2} + (y - ${y})² / ${param2 ** 2} = 1`;
-                    break;
-                case 'parabola':
-                    equation = `y - ${y} = ${param1}(x - ${x})²`;
-                    break;
-                case 'hyperbola':
-                    equation = `(x - ${x})² / ${param1 ** 2} - (y - ${y})² / ${param2 ** 2} = 1`;
-                    break;
-                default:
-                    alert("Неизвестный тип кривой");
-                    return;
+            // Если алгоритм требует центра (circle, ellipse, parabola, hyperbola)
+            if (curveType === "circle" || curveType === "ellipse" || curveType === "parabola" || curveType === "hyperbola") {
+                center = { x, y };
+                document.getElementById('instruction').innerText = `Начальная точка: (${x}, ${y}). Введите параметры.`;
             }
-
-            // Выводим уравнение
-            document.getElementById('instruction').innerText = `Уравнение кривой: ${equation}`;
+            // Для алгоритмов интерполяции – накапливаем точки
+            else if (curveType === "hermite" || curveType === "bezier" || curveType === "bspline") {
+                curvePoints.push({ x, y });
+                // Рисуем небольшую точку для индикации
+                context.fillStyle = "blue";
+                context.beginPath();
+                context.arc(x, y, 3, 0, 2 * Math.PI);
+                context.fill();
+                document.getElementById('instruction').innerText = `Добавлено точек: ${curvePoints.length}`;
+            }
         }
     });
 
-
-    function updateInputs() {
-        const curveType = document.getElementById("curveType").value;
-        const paramsDiv = document.getElementById("params");
-        paramsDiv.innerHTML = '';
-
-        if (curveType === "circle") {
-            paramsDiv.innerHTML = `<label>Радиус (r):</label> <input id="param1" type="number" />`;
-        } else if (curveType === "ellipse" || curveType === "hyperbola") {
-            paramsDiv.innerHTML = `
-                <label>a:</label> <input id="param1" type="number" />
-                <label>b:</label> <input id="param2" type="number" />
-            `;
-        } else if (curveType === "parabola") {
-            paramsDiv.innerHTML = `<label>Фокус (a):</label> <input id="param1" type="number" />`;
-        }
-    }
-
     function drawLine(x1, y1, x2, y2) {
         const algorithm = document.getElementById("algorithm").value;
-        let pixels = [];
-
-        // Отправка запроса на сервер для рисования линии
-        console.log("log:", x1, y1, x2, y2, algorithm);
-        stompClient.send("/app/draw", {}, JSON.stringify({x1, y1, x2, y2, algorithm}));
+        console.log("Отправка линии:", x1, y1, x2, y2, algorithm);
+        stompClient.send("/app/draw", {}, JSON.stringify({ x1, y1, x2, y2, algorithm }));
     }
 
     function drawCurve() {
         const curveType = document.getElementById("curveType").value;
-        const param1 = parseFloat(document.getElementById("param1").value);
-        const param2 = document.getElementById("param2") ? parseFloat(document.getElementById("param2").value) : null;
-
-        let pixels = [];
-
-        // Отправка запроса на сервер для рисования кривой
-        stompClient.send("/app/draw", {}, JSON.stringify({curveType, center, param1, param2}));
+        // Для кривых с центром – берем параметры и центр
+        if (curveType === "circle" || curveType === "ellipse" ||
+            curveType === "parabola" || curveType === "hyperbola") {
+            if (!center) {
+                alert("Сначала кликните по canvas для выбора начальной точки!");
+                return;
+            }
+            const param1 = parseFloat(document.getElementById("param1").value);
+            const param2 = document.getElementById("param2") ? parseFloat(document.getElementById("param2").value) : null;
+            stompClient.send("/app/draw", {}, JSON.stringify({ curveType, center, param1, param2 }));
+        }
+        // Для интерполяционных кривых – отправляем накопленные точки
+        else if (curveType === "hermite" || curveType === "bezier" || curveType === "bspline") {
+            if (curvePoints.length === 0) {
+                alert("Добавьте хотя бы одну точку!");
+                return;
+            }
+            stompClient.send("/app/draw", {}, JSON.stringify({ curveType, points: curvePoints }));
+            // После отправки можно очистить накопленные точки
+            curvePoints = [];
+        }
     }
 </script>
 </body>

@@ -10,6 +10,7 @@ import java.awt.*;
 @Builder
 @Getter
 @Setter
+@NoArgsConstructor
 @AllArgsConstructor
 public class Pixel {
     private int x;
