@@ -1,0 +1,89 @@
+package by.lupach.drawingeditor.services;
+
+import by.lupach.drawingeditor.models.Matrix4f;
+import by.lupach.drawingeditor.models.Pixel;
+import by.lupach.drawingeditor.models.TransformationRequest;
+import by.lupach.drawingeditor.models.TransformationResponse;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
+
+@Service
+public class TransformationService {
+
+    // Размер canvas и масштаб (аналог Swing‑приложения)
+    private final int canvasWidth = 800;
+    private final int canvasHeight = 600;
+    private final double scale = 100.0;
+
+    @Autowired
+    private LineDrawingService lineDrawingService;
+
+    // Текущая матрица преобразования (аккумулируется между запросами)
+    private double[][] currentMatrix = Matrix4f.identity();
+
+    public TransformationResponse applyTransformation(TransformationRequest request) {
+        // Создаём матрицу для текущей операции
+        double[][] newTransform = Matrix4f.identity();
+        switch (request.getTransformationType()) {
+            case "translation":
+                newTransform = Matrix4f.translation(request.getX(), request.getY(), request.getZ());
+                break;
+            case "rotationX":
+                newTransform = Matrix4f.rotationX(request.getAngle());
+                break;
+            case "rotationY":
+                newTransform = Matrix4f.rotationY(request.getAngle());
+                break;
+            case "scaling":
+                newTransform = Matrix4f.scaling(request.getSx(), request.getSy(), request.getSz());
+                break;
+            case "perspective":
+                newTransform = Matrix4f.perspective(request.getD());
+                break;
+            default:
+                // Если тип не определён, можно оставить матрицу без изменений
+                break;
+        }
+        // Обновляем текущую матрицу (накопительно: новое преобразование умножается слева)
+        currentMatrix = Matrix4f.multiply(newTransform, currentMatrix);
+
+        // Преобразуем вершины, переданные в запросе, с использованием обновлённой матрицы
+        double[][] transformedVertices = transform(request.getVertices(), currentMatrix);
+
+        // Вычисляем пиксели для всех рёбер
+        List<Pixel> pixels = new ArrayList<>();
+        for (int[] edge : request.getEdges()) {
+            double[] v0 = transformedVertices[edge[0]];
+            double[] v1 = transformedVertices[edge[1]];
+
+            // Перевод в экранные координаты
+            int x0 = (int) (canvasWidth / 2 + v0[0] * scale);
+            int y0 = (int) (canvasHeight / 2 - v0[1] * scale);
+            int x1 = (int) (canvasWidth / 2 + v1[0] * scale);
+            int y1 = (int) (canvasHeight / 2 - v1[1] * scale);
+
+            // Добавляем пиксели линии (алгоритм Брезенхема)
+            pixels.addAll(lineDrawingService.generateBresenhamLine(x0, y0, x1, y1));
+        }
+
+        // Возвращаем ответ с пикселями и текущей матрицей
+        return new TransformationResponse(pixels, currentMatrix);
+    }
+
+    private double[][] transform(double[][] points, double[][] matrix) {
+        double[][] result = new double[points.length][4];
+        for (int i = 0; i < points.length; i++) {
+            result[i] = Matrix4f.multiply(matrix, points[i]);
+            // Перспективное деление
+            if (result[i][3] != 0) {
+                result[i][0] /= result[i][3];
+                result[i][1] /= result[i][3];
+                result[i][2] /= result[i][3];
+            }
+        }
+        return result;
+    }
+}

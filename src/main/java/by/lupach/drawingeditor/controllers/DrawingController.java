@@ -1,13 +1,13 @@
 package by.lupach.drawingeditor.controllers;
 
-import by.lupach.drawingeditor.models.DrawingRequest;
-import by.lupach.drawingeditor.models.Pixel;
-import by.lupach.drawingeditor.services.CurveDrawingService;
-import by.lupach.drawingeditor.services.CurveInterpolationAndApproximation;
-import by.lupach.drawingeditor.services.LineDrawingService;
+import by.lupach.drawingeditor.models.*;
+import by.lupach.drawingeditor.services.*;
 import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.ArrayList;
 import java.util.List;
 
 @RestController
@@ -16,24 +16,26 @@ public class DrawingController {
 
     private final LineDrawingService lineDrawingService;
     private final CurveDrawingService curveDrawingService;
+    private final TransformationService transformationService;
     private final CurveInterpolationAndApproximation interpolationService;
-    private final SimpMessagingTemplate messagingTemplate; // For sending messages to WebSocket
+    private final SimpMessagingTemplate messagingTemplate; // Для отправки сообщений через WebSocket
 
     public DrawingController(LineDrawingService lineDrawingService,
-                             CurveDrawingService curveDrawingService,
+                             CurveDrawingService curveDrawingService, TransformationService transformationService,
                              CurveInterpolationAndApproximation interpolationService,
                              SimpMessagingTemplate messagingTemplate) {
         this.lineDrawingService = lineDrawingService;
         this.curveDrawingService = curveDrawingService;
+        this.transformationService = transformationService;
         this.interpolationService = interpolationService;
-        this.messagingTemplate = messagingTemplate;
+        this.messagingTemplate = messagingTemplate; // Инициализация SimpMessagingTemplate
     }
 
-    @MessageMapping("/draw") // Слушаем сообщения от WebSocket клиентов
+    @MessageMapping("/draw") // Обработка сообщений от WebSocket клиентов
     public void draw(@RequestBody DrawingRequest drawingRequest) {
         List<Pixel> pixels = null;
 
-        // Обработка рисования линий (алгоритмы DDA, Bresenham, Wu)
+        // Обработка рисования линий
         if (drawingRequest.getAlgorithm() != null) {
             pixels = switch (drawingRequest.getAlgorithm()) {
                 case "dda" -> lineDrawingService.generateDDALine(
@@ -73,7 +75,6 @@ public class DrawingController {
                                 (int) drawingRequest.getCenter().getY(),
                                 drawingRequest.getParam1(),
                                 drawingRequest.getParam2());
-                // Новые алгоритмы интерполяции/аппроксимации
                 case "hermite" ->
                         pixels = interpolationService.generateHermiteCurve(drawingRequest.getPoints());
                 case "bezier" ->
@@ -85,42 +86,12 @@ public class DrawingController {
             }
         }
 
-        messagingTemplate.convertAndSend("/topic/drawings", pixels); // Отправляем пиксели на топик
+        messagingTemplate.convertAndSend("/topic/drawings", pixels);
     }
 
-
-    @GetMapping("/line/dda")
-    public List<Pixel> drawDDALine(@RequestParam int x1, @RequestParam int y1, @RequestParam int x2, @RequestParam int y2) {
-        return lineDrawingService.generateDDALine(x1, y1, x2, y2);
-    }
-
-    @GetMapping("/line/bresenham")
-    public List<Pixel> drawBresenhamLine(@RequestParam int x1, @RequestParam int y1, @RequestParam int x2, @RequestParam int y2) {
-        return lineDrawingService.generateBresenhamLine(x1, y1, x2, y2);
-    }
-
-    @GetMapping("/line/wu")
-    public List<Pixel> drawWuLine(@RequestParam int x1, @RequestParam int y1, @RequestParam int x2, @RequestParam int y2) {
-        return lineDrawingService.generateWuLine(x1, y1, x2, y2);
-    }
-
-    @GetMapping("/curve/circle")
-    public List<Pixel> drawCircle(@RequestParam int x, @RequestParam int y, @RequestParam double r) {
-        return curveDrawingService.generateCircle(x, y, r);
-    }
-
-    @GetMapping("/curve/ellipse")
-    public List<Pixel> drawEllipse(@RequestParam int x, @RequestParam int y, @RequestParam double a, @RequestParam double b) {
-        return curveDrawingService.generateEllipse(x, y, a, b);
-    }
-
-    @GetMapping("/curve/parabola")
-    public List<Pixel> drawParabola(@RequestParam int x, @RequestParam int y, @RequestParam double a) {
-        return curveDrawingService.generateParabola(x, y, a);
-    }
-
-    @GetMapping("/curve/hyperbola")
-    public List<Pixel> drawHyperbola(@RequestParam int x, @RequestParam int y, @RequestParam double a, @RequestParam double b) {
-        return curveDrawingService.generateHyperbola(x, y, a, b);
+    @MessageMapping("/transform3D")
+    public void handleTransformation(TransformationRequest request) {
+        TransformationResponse response = transformationService.applyTransformation(request);
+        messagingTemplate.convertAndSend("/topic/drawings3d", response);
     }
 }
