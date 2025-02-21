@@ -13,6 +13,7 @@
 <div class="text-center mb-3">
     <button onclick="drawingEditor.showTab('lines')" class="btn btn-outline-primary me-2">Линии</button>
     <button onclick="drawingEditor.showTab('curves')" class="btn btn-outline-primary me-2">Кривые</button>
+    <button onclick="drawingEditor.showTab('polygon')" class="btn btn-outline-primary me-2">Полигоны</button>
     <button onclick="drawingEditor.showTab('3d')" class="btn btn-outline-primary me-2">3D</button>
     <!-- Debug режим -->
     <input onclick="drawingEditor.toggleDebug()" type="checkbox" id="debug_checkbox" class="btn btn-outline-primary">Debug</input>
@@ -59,6 +60,16 @@
         <option value="bresenham">Bresenham</option>
         <option value="wu">Wu</option>
     </select>
+</div>
+
+<!-- Панель для полигонов -->
+<div id="polygon" class="mb-3" style="display:none;">
+
+    <button onclick="drawingEditor.checkConvex()" class="btn btn-outline-primary me-2">Проверить выпуклость</button>
+    <button onclick="drawingEditor.convexHullGraham()" class="btn btn-outline-primary me-2">Выпуклая оболочка (Грэхем)</button>
+    <button onclick="drawingEditor.convexHullJarvis()" class="btn btn-outline-primary me-2">Выпуклая оболочка (Джарвис)</button>
+    <button onclick="drawingEditor.checkPointInside()" class="btn btn-outline-primary me-2">Проверить точку внутри</button>
+    <button onclick="drawingEditor.checkSegmentIntersects()" class="btn btn-outline-primary me-2">Проверить пересечение отрезка</button>
 </div>
 
 <!-- Панель для кривых -->

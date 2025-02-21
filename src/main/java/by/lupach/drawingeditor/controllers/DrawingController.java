@@ -3,11 +3,9 @@ package by.lupach.drawingeditor.controllers;
 import by.lupach.drawingeditor.models.*;
 import by.lupach.drawingeditor.services.*;
 import org.springframework.messaging.handler.annotation.MessageMapping;
-import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @RestController
@@ -18,17 +16,20 @@ public class DrawingController {
     private final CurveDrawingService curveDrawingService;
     private final TransformationService transformationService;
     private final CurveInterpolationAndApproximation interpolationService;
-    private final SimpMessagingTemplate messagingTemplate; // Для отправки сообщений через WebSocket
+    private final PolygonService polygonService; // Добавлен сервис для работы с полигонами
+    private final SimpMessagingTemplate messagingTemplate;
 
     public DrawingController(LineDrawingService lineDrawingService,
                              CurveDrawingService curveDrawingService, TransformationService transformationService,
                              CurveInterpolationAndApproximation interpolationService,
+                             PolygonService polygonService, // Добавлен сервис для работы с полигонами
                              SimpMessagingTemplate messagingTemplate) {
         this.lineDrawingService = lineDrawingService;
         this.curveDrawingService = curveDrawingService;
         this.transformationService = transformationService;
         this.interpolationService = interpolationService;
-        this.messagingTemplate = messagingTemplate; // Инициализация SimpMessagingTemplate
+        this.polygonService = polygonService; // Инициализация сервиса для работы с полигонами
+        this.messagingTemplate = messagingTemplate;
     }
 
     @MessageMapping("/draw") // Обработка сообщений от WebSocket клиентов
@@ -93,5 +94,32 @@ public class DrawingController {
     public void handleTransformation(TransformationRequest request) {
         TransformationResponse response = transformationService.applyTransformation(request);
         messagingTemplate.convertAndSend("/topic/drawings3d", response);
+    }
+
+    // Новые методы для работы с полигонами
+
+    @PostMapping("/checkConvex")
+    public boolean checkConvex(@RequestBody List<Pixel> polygon) {
+        return polygonService.isConvex(polygon);
+    }
+
+    @PostMapping("/convexHullGraham")
+    public List<Pixel> convexHullGraham(@RequestBody List<Pixel> points) {
+        return polygonService.convexHullGraham(points);
+    }
+
+    @PostMapping("/convexHullJarvis")
+    public List<Pixel> convexHullJarvis(@RequestBody List<Pixel> points) {
+        return polygonService.convexHullJarvis(points);
+    }
+
+    @PostMapping("/isPointInsidePolygon")
+    public boolean isPointInsidePolygon(@RequestBody PointInsideRequest request) {
+        return polygonService.isPointInsidePolygon(request.getPoint(), request.getPolygon());
+    }
+
+    @PostMapping("/segmentIntersectsPolygon")
+    public boolean segmentIntersectsPolygon(@RequestBody SegmentIntersectsRequest request) {
+        return polygonService.segmentIntersectsPolygon(request.getA(), request.getB(), request.getPolygon());
     }
 }
