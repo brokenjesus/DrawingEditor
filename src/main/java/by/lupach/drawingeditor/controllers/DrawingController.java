@@ -1,6 +1,12 @@
 package by.lupach.drawingeditor.controllers;
 
 import by.lupach.drawingeditor.models.*;
+import by.lupach.drawingeditor.models.linesAndCurves.DrawingRequest;
+import by.lupach.drawingeditor.models.polygons.PointInsideRequest;
+import by.lupach.drawingeditor.models.polygons.PolygonFillRequest;
+import by.lupach.drawingeditor.models.polygons.SegmentIntersectsRequest;
+import by.lupach.drawingeditor.models.threeD.TransformationRequest;
+import by.lupach.drawingeditor.models.threeD.TransformationResponse;
 import by.lupach.drawingeditor.services.*;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -121,5 +127,25 @@ public class DrawingController {
     @PostMapping("/segmentIntersectsPolygon")
     public boolean segmentIntersectsPolygon(@RequestBody SegmentIntersectsRequest request) {
         return polygonService.segmentIntersectsPolygon(request.getA(), request.getB(), request.getPolygon());
+    }
+
+    @MessageMapping("/fillPolygon")
+    public void fillPolygon(@RequestBody PolygonFillRequest request) {
+        List<Pixel> filledPixels = null;
+
+        switch (request.getAlgorithm()) {
+            case "scanline" ->
+                    filledPixels = polygonService.scanlineFill(request.getPolygon());
+            case "aet" ->
+                    filledPixels = polygonService.aetFill(request.getPolygon());
+            case "floodFill" ->
+                    filledPixels = polygonService.floodFill(request.getSeed(), request.getPolygon(), request.getFillColor(), request.getBoundaryColor());
+            case "scanlineFloodFill" ->
+                    filledPixels = polygonService.scanlineFloodFill(request.getSeed(), request.getPolygon(), request.getFillColor(), request.getBoundaryColor());
+            default ->
+                    throw new IllegalArgumentException("Unknown fill algorithm: " + request.getAlgorithm());
+        }
+
+        messagingTemplate.convertAndSend("/topic/drawings", filledPixels);
     }
 }

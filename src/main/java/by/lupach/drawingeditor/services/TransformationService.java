@@ -1,9 +1,9 @@
 package by.lupach.drawingeditor.services;
 
-import by.lupach.drawingeditor.models.Matrix4f;
+import by.lupach.drawingeditor.models.threeD.Matrix4f;
 import by.lupach.drawingeditor.models.Pixel;
-import by.lupach.drawingeditor.models.TransformationRequest;
-import by.lupach.drawingeditor.models.TransformationResponse;
+import by.lupach.drawingeditor.models.threeD.TransformationRequest;
+import by.lupach.drawingeditor.models.threeD.TransformationResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 

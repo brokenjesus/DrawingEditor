@@ -1,5 +1,6 @@
-package by.lupach.drawingeditor.models;
+package by.lupach.drawingeditor.models.linesAndCurves;
 
+import by.lupach.drawingeditor.models.Pixel;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;

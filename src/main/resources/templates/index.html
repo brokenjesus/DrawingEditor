@@ -18,7 +18,7 @@
     <!-- Debug режим -->
     <input onclick="drawingEditor.toggleDebug()" type="checkbox" id="debug_checkbox" class="btn btn-outline-primary">Debug</input>
     <!-- Очистка холста -->
-    <button onclick="drawingEditor.clearCanvas()" style="color:white;" class="btn btn-danger ms-2">Очистить</button>
+    <button onclick="drawingEditor.clear()" style="color:white;" class="btn btn-danger ms-2">Очистить</button>
 </div>
 
 <!-- Панель для 3D -->
@@ -64,12 +64,20 @@
 
 <!-- Панель для полигонов -->
 <div id="polygon" class="mb-3" style="display:none;">
-
     <button onclick="drawingEditor.checkConvex()" class="btn btn-outline-primary me-2">Проверить выпуклость</button>
     <button onclick="drawingEditor.convexHullGraham()" class="btn btn-outline-primary me-2">Выпуклая оболочка (Грэхем)</button>
     <button onclick="drawingEditor.convexHullJarvis()" class="btn btn-outline-primary me-2">Выпуклая оболочка (Джарвис)</button>
     <button onclick="drawingEditor.checkPointInside()" class="btn btn-outline-primary me-2">Проверить точку внутри</button>
     <button onclick="drawingEditor.checkSegmentIntersects()" class="btn btn-outline-primary me-2">Проверить пересечение отрезка</button>
+
+    <!-- Кнопки для заполнения полигонов -->
+    <select id="fillAlgorithm" class="form-select w-auto d-inline-block">
+        <option value="scanline">Сканирующая линия</option>
+        <option value="aet">Активные ребра (AET)</option>
+        <option value="floodFill">Затравка (Flood Fill)</option>
+        <option value="scanlineFloodFill">Построчная затравка</option>
+    </select>
+    <button onclick="drawingEditor.fillPolygon()" class="btn btn-outline-primary me-2">Заполнить полигон</button>
 </div>
 
 <!-- Панель для кривых -->

@@ -1,4 +1,4 @@
-package by.lupach.drawingeditor.models;
+package by.lupach.drawingeditor.models.threeD;
 
 public class Matrix4f {
 

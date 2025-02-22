@@ -121,6 +121,11 @@ const drawingEditor = {
 
     clearCanvas() {
         this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        // this.clearPoints();
+    },
+
+    clear(){
+        this.clearCanvas();
         this.clearPoints();
     },
 
@@ -238,7 +243,12 @@ const drawingEditor = {
         })
             .then(response => response.json())
             .then(data => {
-                this.drawPixels(data);
+                this.polygonPoints = data;
+                this.clearCanvas();
+                for (let i=-1; i<data.length-1; i++){
+                    this.drawLine(data.at(i).x, data.at(i).y, data.at(i+1).x, data.at(i+1).y)
+                }
+                // this.drawPixels(data);
             });
     },
 
@@ -252,7 +262,12 @@ const drawingEditor = {
         })
             .then(response => response.json())
             .then(data => {
-                this.drawPixels(data);
+                this.polygonPoints = data;
+                this.clearCanvas();
+                for (let i=-1; i<data.length-1; i++){
+                    this.drawLine(data.at(i).x, data.at(i).y, data.at(i+1).x, data.at(i+1).y)
+                }
+                // this.drawPixels(data);
             });
     },
 
@@ -297,6 +312,27 @@ const drawingEditor = {
             });
     },
 
+    fillPolygon() {
+        if (this.polygonPoints.length < 3) {
+            alert("Добавьте хотя бы 3 точки для полигона!");
+            return;
+        }
+
+        const algorithm = document.getElementById("fillAlgorithm").value;
+        const seed = this.polygonPoints[0]; // Затравка (начальная точка)
+        const fillColor = "rgba(255, 20, 147, 0.2)"; // Цвет заполнения
+        const boundaryColor = "rgba(0, 0, 0, 1)"; // Цвет границы
+
+        const request = {
+            polygon: this.polygonPoints,
+            algorithm: algorithm,
+            seed: seed,
+            fillColor: fillColor,
+            boundaryColor: boundaryColor
+        };
+
+        this.socketConnection.send("/app/fillPolygon", request);
+    },
     load3DObject() {
         const fileInput = document.getElementById('objFileInput');
         if (fileInput.files.length === 0) {

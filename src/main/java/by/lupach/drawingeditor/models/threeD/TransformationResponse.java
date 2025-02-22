@@ -1,5 +1,6 @@
-package by.lupach.drawingeditor.models;
+package by.lupach.drawingeditor.models.threeD;
 
+import by.lupach.drawingeditor.models.Pixel;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
