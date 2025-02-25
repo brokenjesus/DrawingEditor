@@ -22,19 +22,21 @@ public class DrawingController {
     private final CurveDrawingService curveDrawingService;
     private final TransformationService transformationService;
     private final CurveInterpolationAndApproximation interpolationService;
-    private final PolygonService polygonService; // Добавлен сервис для работы с полигонами
+    private final PolygonService polygonService;
+    private final VoronoiDiagramService voronoiDiagramService;
     private final SimpMessagingTemplate messagingTemplate;
 
     public DrawingController(LineDrawingService lineDrawingService,
                              CurveDrawingService curveDrawingService, TransformationService transformationService,
                              CurveInterpolationAndApproximation interpolationService,
-                             PolygonService polygonService, // Добавлен сервис для работы с полигонами
+                             PolygonService polygonService, VoronoiDiagramService voronoiDiagramService, // Добавлен сервис для работы с полигонами
                              SimpMessagingTemplate messagingTemplate) {
         this.lineDrawingService = lineDrawingService;
         this.curveDrawingService = curveDrawingService;
         this.transformationService = transformationService;
         this.interpolationService = interpolationService;
         this.polygonService = polygonService; // Инициализация сервиса для работы с полигонами
+        this.voronoiDiagramService = voronoiDiagramService;
         this.messagingTemplate = messagingTemplate;
     }
 
@@ -102,7 +104,6 @@ public class DrawingController {
         messagingTemplate.convertAndSend("/topic/drawings3d", response);
     }
 
-    // Новые методы для работы с полигонами
 
     @PostMapping("/checkConvex")
     public boolean checkConvex(@RequestBody List<Pixel> polygon) {
@@ -147,5 +148,12 @@ public class DrawingController {
         }
 
         messagingTemplate.convertAndSend("/topic/drawings", filledPixels);
+    }
+
+    @MessageMapping("/voronoiDiagram")
+    public void delaunayTriangulator(@RequestBody List<Pixel> request) {
+        List<Pixel> response = VoronoiDiagramService.buildVoronoiDiagram(request, lineDrawingService);
+
+        messagingTemplate.convertAndSend("/topic/drawings", response);
     }
 }

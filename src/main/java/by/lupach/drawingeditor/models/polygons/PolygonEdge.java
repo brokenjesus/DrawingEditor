@@ -4,13 +4,13 @@ import by.lupach.drawingeditor.models.Pixel;
 import lombok.Data;
 
 @Data
-public class Edge {
+public class PolygonEdge {
     int yMax;
     int yMin;
     double x;
     double dxPerY;
 
-    public Edge(Pixel p1, Pixel p2) {
+    public PolygonEdge(Pixel p1, Pixel p2) {
         if (p1.getY() < p2.getY()) {
             yMin = p1.getY();
             yMax = p2.getY();

@@ -1,17 +1,18 @@
 package by.lupach.drawingeditor.services;
 
+import by.lupach.drawingeditor.configs.ScreenConstants;
 import by.lupach.drawingeditor.models.Pixel;
-import by.lupach.drawingeditor.models.polygons.Edge;
+import by.lupach.drawingeditor.models.polygons.PolygonEdge;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+
+import static by.lupach.drawingeditor.configs.ScreenConstants.SCREEN_HEIGHT;
+import static by.lupach.drawingeditor.configs.ScreenConstants.SCREEN_WIDTH;
+
 @Service
 public class PolygonService {
-
-    int SCREEN_WIDTH = 1280;
-    int SCREEN_HEIGHT = 720;
-
-    // Проверка, является ли полигон выпуклым
+        // Проверка, является ли полигон выпуклым
     public boolean isConvex(List<Pixel> polygon) {
         int n = polygon.size();
         if (n < 3) return false;
@@ -58,9 +59,8 @@ public class PolygonService {
         }
 
         hull.pop(); // Убираем дублирующую вершину
-        List<Pixel> convexHull = new ArrayList<>(hull);
 
-        return convexHull;
+        return new ArrayList<>(hull);
 //        return fillPolygon(convexHull);
     }
 
@@ -124,86 +124,54 @@ public class PolygonService {
         int d3 = crossProduct(a, b, c);
         int d4 = crossProduct(a, b, d);
 
-        if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
-                ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return true;
-
-        return false;
-    }
-
-    // Метод для заполнения полигона пикселями
-    private List<Pixel> fillPolygon(List<Pixel> polygon) {
-        List<Pixel> filledPixels = new ArrayList<>();
-
-        // Находим минимальные и максимальные значения X и Y
-        int minX = Integer.MAX_VALUE;
-        int maxX = Integer.MIN_VALUE;
-        int minY = Integer.MAX_VALUE;
-        int maxY = Integer.MIN_VALUE;
-
-        for (Pixel p : polygon) {
-            if (p.getX() < minX) minX = p.getX();
-            if (p.getX() > maxX) maxX = p.getX();
-            if (p.getY() < minY) minY = p.getY();
-            if (p.getY() > maxY) maxY = p.getY();
-        }
-
-        // Проходим по всем пикселям внутри ограничивающего прямоугольника
-        for (int x = minX; x <= maxX; x++) {
-            for (int y = minY; y <= maxY; y++) {
-                Pixel p = new Pixel(x, y, "rgba(255, 20, 147, 0.2)");
-                if (isPointInsidePolygon(p, polygon)) {
-                    filledPixels.add(p);
-                }
-            }
-        }
-
-        return filledPixels;
+        return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+                ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
     }
 
     public List<Pixel> scanlineFill(List<Pixel> polygon) {
         List<Pixel> filledPixels = new ArrayList<>();
-        List<Edge> edges = new ArrayList<>();
+        List<PolygonEdge> PolygonEdges = new ArrayList<>();
 
         for (int i = 0; i < polygon.size(); i++) {
             Pixel p1 = polygon.get(i);
             Pixel p2 = polygon.get((i+1)%polygon.size());
             if (p1.getY() != p2.getY()) {
-                Edge edge = new Edge(p1, p2);
-                edges.add(edge);
+                PolygonEdge polygonEdge = new PolygonEdge(p1, p2);
+                PolygonEdges.add(polygonEdge);
             }
         }
 
-        edges.sort(Comparator.comparingInt(e -> e.getYMax()));
+        PolygonEdges.sort(Comparator.comparingInt(PolygonEdge::getYMax));
 
-        int yMin = edges.stream().mapToInt(e -> e.getYMin()).min().orElse(0);
-        int yMax = edges.stream().mapToInt(e -> e.getYMax()).max().orElse(0);
+        int yMin = PolygonEdges.stream().mapToInt(PolygonEdge::getYMin).min().orElse(0);
+        int yMax = PolygonEdges.stream().mapToInt(PolygonEdge::getYMax).max().orElse(0);
 
-        List<Edge> activeEdges = new ArrayList<>();
+        List<PolygonEdge> activePolygonEdges = new ArrayList<>();
 
         for (int y = yMin; y <= yMax-1; y++) {
-            Iterator<Edge> it = edges.iterator();
+            Iterator<PolygonEdge> it = PolygonEdges.iterator();
             while (it.hasNext()) {
-                Edge edge = it.next();
-                if (edge.getYMin() == y) {
-                    activeEdges.add(edge);
+                PolygonEdge polygonEdge = it.next();
+                if (polygonEdge.getYMin() == y) {
+                    activePolygonEdges.add(polygonEdge);
                     it.remove();
                 }
             }
 
-            activeEdges.sort(Comparator.comparingDouble(e -> e.getX()));
+            activePolygonEdges.sort(Comparator.comparingDouble(PolygonEdge::getX));
 
-            for (int i = 0; i < activeEdges.size()-1; i += 2) {
-                int xStart = (int) Math.ceil(activeEdges.get(i).getX());
-                int xEnd = (int) Math.floor(activeEdges.get(i+1).getX());
+            for (int i = 0; i < activePolygonEdges.size()-1; i += 2) {
+                int xStart = (int) Math.ceil(activePolygonEdges.get(i).getX());
+                int xEnd = (int) Math.floor(activePolygonEdges.get(i+1).getX());
                 for (int x = xStart; x <= xEnd; x++) {
                     filledPixels.add(new Pixel(x, y, "rgba(205,20,17,0.2)"));
                 }
             }
 
             int finalY = y;
-            activeEdges.removeIf(edge -> edge.getYMax() == finalY);
-            for (Edge edge : activeEdges) {
-                edge.setX(edge.getX()+edge.getDxPerY());
+            activePolygonEdges.removeIf(PolygonEdge -> PolygonEdge.getYMax() == finalY);
+            for (PolygonEdge polygonEdge : activePolygonEdges) {
+                polygonEdge.setX(polygonEdge.getX()+ polygonEdge.getDxPerY());
             }
         }
 
@@ -212,46 +180,46 @@ public class PolygonService {
 
     public List<Pixel> aetFill(List<Pixel> polygon) {
         List<Pixel> filledPixels = new ArrayList<>();
-        List<Edge> edges = new ArrayList<>();
+        List<PolygonEdge> PolygonEdges = new ArrayList<>();
 
         // Создание и сортировка ребер
         for (int i = 0; i < polygon.size(); i++) {
             Pixel p1 = polygon.get(i);
             Pixel p2 = polygon.get((i+1) % polygon.size());
             if (p1.getY() != p2.getY()) {
-                edges.add(new Edge(p1, p2));
+                PolygonEdges.add(new PolygonEdge(p1, p2));
             }
         }
 
-        edges.sort(Comparator.comparingInt(e -> e.getYMin()));
+        PolygonEdges.sort(Comparator.comparingInt(PolygonEdge::getYMin));
 
-        int yMin = edges.get(0).getYMin();
-        int yMax = edges.stream().mapToInt(e -> e.getYMax()).max().orElse(yMin);
+        int yMin = PolygonEdges.get(0).getYMin();
+        int yMax = PolygonEdges.stream().mapToInt(PolygonEdge::getYMax).max().orElse(yMin);
 
-        List<Edge> activeEdges = new ArrayList<>();
+        List<PolygonEdge> activePolygonEdges = new ArrayList<>();
 
         for (int y = yMin; y <= yMax; y++) {
-            while (!edges.isEmpty() && edges.get(0).getYMin() == y) {
-                activeEdges.add(edges.remove(0));
+            while (!PolygonEdges.isEmpty() && PolygonEdges.get(0).getYMin() == y) {
+                activePolygonEdges.add(PolygonEdges.remove(0));
             }
 
-            activeEdges.sort(Comparator.comparingDouble(e -> e.getX()));
+            activePolygonEdges.sort(Comparator.comparingDouble(PolygonEdge::getX));
 
-            for (int i = 0; i < activeEdges.size()-1; i += 2) {
-                int xStart = (int) Math.ceil(activeEdges.get(i).getX());
-                int xEnd = (int) Math.floor(activeEdges.get(i+1).getX());
+            for (int i = 0; i < activePolygonEdges.size()-1; i += 2) {
+                int xStart = (int) Math.ceil(activePolygonEdges.get(i).getX());
+                int xEnd = (int) Math.floor(activePolygonEdges.get(i+1).getX());
                 for (int x = xStart; x <= xEnd; x++) {
                     filledPixels.add(new Pixel(x, y, "rgba(255,20,147,0.2)"));
                 }
             }
 
-            Iterator<Edge> it = activeEdges.iterator();
+            Iterator<PolygonEdge> it = activePolygonEdges.iterator();
             while (it.hasNext()) {
-                Edge edge = it.next();
-                if (edge.getYMax() == y) {
+                PolygonEdge polygonEdge = it.next();
+                if (polygonEdge.getYMax() == y) {
                     it.remove();
                 } else {
-                    edge.setX(edge.getX()+edge.getDxPerY());
+                    polygonEdge.setX(polygonEdge.getX()+ polygonEdge.getDxPerY());
                 }
             }
         }
@@ -407,14 +375,6 @@ public class PolygonService {
 
         // Сравниваем цвет пикселя с цветом границы
         return pixelColor.equals(boundaryColor);
-    }
-
-    private boolean isColored(Pixel p, String color) {
-        // Получаем цвет пикселя на холсте
-        String pixelColor = p.getColor();
-
-        // Сравниваем цвет пикселя с заданным цветом
-        return pixelColor.equals(color);
     }
 
 }

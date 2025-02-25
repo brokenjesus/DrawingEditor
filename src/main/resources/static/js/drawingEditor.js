@@ -35,7 +35,7 @@ const drawingEditor = {
 
     socketConnection: null,
     debug: false,
-    activeTab: 'lines', center: null, linePoints: [], curvePoints: [], polygonPoints: [],
+    activeTab: 'lines', center: null, linePoints: [], curvePoints: [], polygonPoints: [], voronoiPoints: [],
     current3DObject: null,
     transformationMatrix: null,
 
@@ -113,6 +113,7 @@ const drawingEditor = {
         document.getElementById('curves').style.display = tabName === 'curves' ? 'block' : 'none';
         document.getElementById('threeD').style.display = tabName === '3d' ? 'block' : 'none';
         document.getElementById('polygon').style.display = tabName === 'polygon' ? 'block' : 'none';
+        document.getElementById('voronoi').style.display = tabName === 'voronoi' ? 'block' : 'none';
         document.getElementById('instruction').innerText = 'Кликните, чтобы выбрать точку.';
         if (tabName === '3d') {
             this.updateTransformInputs();
@@ -133,6 +134,7 @@ const drawingEditor = {
         this.linePoints = [];
         this.curvePoints = [];
         this.polygonPoints = [];
+        this.voronoiPoints = [];
     },
 
     drawPixels(pixels) {
@@ -190,6 +192,13 @@ const drawingEditor = {
             this.context.arc(x, y, 3, 0, 2 * Math.PI);
             this.context.fill();
             document.getElementById('instruction').innerText = `Добавлено точек: ${this.polygonPoints.length}`;
+        } else if (this.activeTab === 'voronoi') {
+            this.voronoiPoints.push({x, y});
+            this.context.fillStyle = "rgba(0, 255, 0, 0.2)";
+            this.context.beginPath();
+            this.context.arc(x, y, 3, 0, 2 * Math.PI);
+            this.context.fill();
+            document.getElementById('instruction').innerText = `Добавлено точек: ${this.voronoiPoints.length}`;
         }
     },
 
@@ -250,6 +259,15 @@ const drawingEditor = {
                 }
                 // this.drawPixels(data);
             });
+    },
+
+    generateVoronoiDiagram() {
+        if (this.voronoiPoints.length < 1) {
+            alert("Добавьте хотя бы 1 точку!");
+            return;
+        }
+
+        this.socketConnection.send("/app/voronoiDiagram", this.voronoiPoints);
     },
 
     convexHullJarvis() {
