@@ -140,19 +140,41 @@ const drawingEditor = {
     drawPixels(pixels) {
         if (Array.isArray(pixels)) {
             this.pixels = pixels;
-            pixels.forEach(pixel => {
-                this.context.fillStyle = pixel.color || 'black';
-                this.context.fillRect(pixel.x, pixel.y, 1, 1);
-            });
+            if (this.debug) {
+                pixels.forEach((pixel, index) => {
+                    setTimeout(() => {
+                        this.context.fillStyle = pixel.color || 'black';
+                        this.context.fillRect(pixel.x, pixel.y, 1, 1);
+                    }, index * 10);
+                });
+            } else {
+                pixels.forEach(pixel => {
+                    this.context.fillStyle = pixel.color || 'black';
+                    this.context.fillRect(pixel.x, pixel.y, 1, 1);
+                });
+            }
         } else if (pixels.vertices && pixels.edges) {
-            pixels.edges.forEach(edge => {
-                const startVertex = pixels.vertices[edge.start];
-                const endVertex = pixels.vertices[edge.end];
-                this.context.beginPath();
-                this.context.moveTo(startVertex.x, startVertex.y);
-                this.context.lineTo(endVertex.x, endVertex.y);
-                this.context.stroke();
-            });
+            if (this.debug) {
+                pixels.edges.forEach((edge, index) => {
+                    setTimeout(() => {
+                        const startVertex = pixels.vertices[edge.start];
+                        const endVertex = pixels.vertices[edge.end];
+                        this.context.beginPath();
+                        this.context.moveTo(startVertex.x, startVertex.y);
+                        this.context.lineTo(endVertex.x, endVertex.y);
+                        this.context.stroke();
+                    }, index * 10);
+                });
+            } else {
+                pixels.edges.forEach(edge => {
+                    const startVertex = pixels.vertices[edge.start];
+                    const endVertex = pixels.vertices[edge.end];
+                    this.context.beginPath();
+                    this.context.moveTo(startVertex.x, startVertex.y);
+                    this.context.lineTo(endVertex.x, endVertex.y);
+                    this.context.stroke();
+                });
+            }
         }
     },
 
@@ -338,14 +360,12 @@ const drawingEditor = {
 
         const algorithm = document.getElementById("fillAlgorithm").value;
         const seed = this.polygonPoints[0]; // Затравка (начальная точка)
-        const fillColor = "rgba(255, 20, 147, 0.2)"; // Цвет заполнения
         const boundaryColor = "rgba(0, 0, 0, 1)"; // Цвет границы
 
         const request = {
             polygon: this.polygonPoints,
             algorithm: algorithm,
             seed: seed,
-            fillColor: fillColor,
             boundaryColor: boundaryColor
         };
 

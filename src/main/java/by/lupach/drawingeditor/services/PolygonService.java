@@ -1,11 +1,11 @@
 package by.lupach.drawingeditor.services;
 
-import by.lupach.drawingeditor.configs.ScreenConstants;
 import by.lupach.drawingeditor.models.Pixel;
 import by.lupach.drawingeditor.models.polygons.PolygonEdge;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.List;
 
 import static by.lupach.drawingeditor.configs.ScreenConstants.SCREEN_HEIGHT;
 import static by.lupach.drawingeditor.configs.ScreenConstants.SCREEN_WIDTH;
@@ -35,6 +35,14 @@ public class PolygonService {
     }
 
     // Алгоритм Грэхема
+    /**
+     * 1. Выбираем точку с наименьшей X.
+     * 2. Сортируем все точки по углу наклона относительно этой опорной точки.
+     * 3. Проходим по отсортированным точкам, используя стек:
+     *    - Если новая точка образует "правый поворот" относительно предыдущих двух, убираем предыдущую.
+     *    - Если "левый поворот" — добавляем в стек.
+     * 4. В стеке остаются точки выпуклой оболочки.
+     **/
     public List<Pixel> convexHullGraham(List<Pixel> points) {
         if (points.size() < 3) return points;
 
@@ -61,10 +69,15 @@ public class PolygonService {
         hull.pop(); // Убираем дублирующую вершину
 
         return new ArrayList<>(hull);
-//        return fillPolygon(convexHull);
     }
 
     // Алгоритм Джарвиса
+    /**
+     * 1. Находим самую левую точку (она точно принадлежит оболочке).
+     * 2. Выбираем точку, образующую самый левый поворот.
+     * 3. Повторяем процесс, пока не вернемся в начальную точку.
+     * 4. Итоговый список содержит точки выпуклой оболочки.
+     **/
     public List<Pixel> convexHullJarvis(List<Pixel> points) {
         if (points.size() < 3) return points;
 
@@ -83,8 +96,6 @@ public class PolygonService {
 
 
         return hull;
-        // Заполняем полигон пикселями
-//        return fillPolygon(hull);
     }
 
     // Проверка принадлежности точки полигону
@@ -113,7 +124,6 @@ public class PolygonService {
         return false;
     }
 
-    // Вспомогательные методы
     private int crossProduct(Pixel a, Pixel b, Pixel c) {
         return (b.getX() - a.getX()) * (c.getY() - a.getY()) - (b.getY() - a.getY()) * (c.getX() - a.getX());
     }
@@ -128,111 +138,144 @@ public class PolygonService {
                 ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
     }
 
+    //Алгоритм растровой развертки с упорядоченным списком ребер
+    /**
+     * Алгоритм:
+     * 1. Находим минимальную и максимальную Y-координаты полигона.
+     * 2. Для каждой строки (сканирующей линии) от minY до maxY:
+     *    - Находим точки пересечения сканирующей линии с ребрами полигона.
+     *    - Сортируем точки пересечения по X-координате.
+     *    - Заполняем пиксели между каждой парой точек пересечения.
+     */
     public List<Pixel> scanlineFill(List<Pixel> polygon) {
-        List<Pixel> filledPixels = new ArrayList<>();
-        List<PolygonEdge> PolygonEdges = new ArrayList<>();
-
-        for (int i = 0; i < polygon.size(); i++) {
-            Pixel p1 = polygon.get(i);
-            Pixel p2 = polygon.get((i+1)%polygon.size());
-            if (p1.getY() != p2.getY()) {
-                PolygonEdge polygonEdge = new PolygonEdge(p1, p2);
-                PolygonEdges.add(polygonEdge);
-            }
+        // Find min and max y coordinates
+        int minY = Integer.MAX_VALUE;
+        int maxY = Integer.MIN_VALUE;
+        for (Pixel point : polygon) {
+            minY = Math.min(minY, point.getY());
+            maxY = Math.max(maxY, point.getY());
         }
 
-        PolygonEdges.sort(Comparator.comparingInt(PolygonEdge::getYMax));
+        List<Pixel> filledPixels = new ArrayList<>();
 
-        int yMin = PolygonEdges.stream().mapToInt(PolygonEdge::getYMin).min().orElse(0);
-        int yMax = PolygonEdges.stream().mapToInt(PolygonEdge::getYMax).max().orElse(0);
+        // Loop through all scanline y values from minY to maxY
+        for (int y = minY; y <= maxY; y++) {
+            List<Integer> intersections = new ArrayList<>();
 
-        List<PolygonEdge> activePolygonEdges = new ArrayList<>();
+            // Check for intersections with each edge of the polygon
+            for (int i = 0; i < polygon.size(); i++) {
+                Pixel point1 = polygon.get(i);
+                Pixel point2 = polygon.get((i + 1) % polygon.size());
+                int x1 = point1.getX(), y1 = point1.getY();
+                int x2 = point2.getX(), y2 = point2.getY();
 
-        for (int y = yMin; y <= yMax-1; y++) {
-            Iterator<PolygonEdge> it = PolygonEdges.iterator();
-            while (it.hasNext()) {
-                PolygonEdge polygonEdge = it.next();
-                if (polygonEdge.getYMin() == y) {
-                    activePolygonEdges.add(polygonEdge);
-                    it.remove();
+                // Skip horizontal edges
+                if (y1 == y2) continue;
+
+                // Check if the scanline intersects the edge
+                if (Math.min(y1, y2) <= y && y < Math.max(y1, y2)) {
+                    int x = x1 + (y - y1) * (x2 - x1) / (y2 - y1);
+                    intersections.add(x);
                 }
             }
 
-            activePolygonEdges.sort(Comparator.comparingDouble(PolygonEdge::getX));
+            // Sort the intersection points
+            Collections.sort(intersections);
 
-            for (int i = 0; i < activePolygonEdges.size()-1; i += 2) {
-                int xStart = (int) Math.ceil(activePolygonEdges.get(i).getX());
-                int xEnd = (int) Math.floor(activePolygonEdges.get(i+1).getX());
+            // Fill between each pair of intersections
+            for (int i = 0; i < intersections.size() - 1; i += 2) {
+                int xStart = Math.round(intersections.get(i));
+                int xEnd = Math.round(intersections.get(i + 1));
+
                 for (int x = xStart; x <= xEnd; x++) {
-                    filledPixels.add(new Pixel(x, y, "rgba(205,20,17,0.2)"));
+                    filledPixels.add(new Pixel(x, y, "rgba(205,20,217,0.2)"));
                 }
-            }
-
-            int finalY = y;
-            activePolygonEdges.removeIf(PolygonEdge -> PolygonEdge.getYMax() == finalY);
-            for (PolygonEdge polygonEdge : activePolygonEdges) {
-                polygonEdge.setX(polygonEdge.getX()+ polygonEdge.getDxPerY());
             }
         }
 
         return filledPixels;
     }
 
-    public List<Pixel> aetFill(List<Pixel> polygon) {
-        List<Pixel> filledPixels = new ArrayList<>();
-        List<PolygonEdge> PolygonEdges = new ArrayList<>();
+    //Алгоритм растровой развертки с упорядоченным списком ребер, использующий список активных ребер
+    /**
+     Алгоритм:
+     * 1. Находим минимальную и максимальную Y-координаты полигона.
+     * 2. Создаем список всех ребер полигона, исключая горизонтальные ребра.
+     * 3. Для каждой строки (сканирующей линии) от minY до maxY:
+     *    - Добавляем в AEL ребра, которые начинаются на текущей строке.
+     *    - Удаляем из AEL ребра, которые заканчиваются на текущей строке.
+     *    - Сортируем AEL по X-координате пересечения с текущей строкой.
+     *    - Заполняем пиксели между каждой парой ребер в AEL.
+     */
+    public List<Pixel> activeEdgeFill(List<Pixel> points) {
+        int minY = points.stream().min(Comparator.comparingInt(Pixel::getY)).get().getY();
+        int maxY = points.stream().max(Comparator.comparingInt(Pixel::getY)).get().getY();
+        List<Pixel> filledPoints = new ArrayList<>();
 
-        // Создание и сортировка ребер
-        for (int i = 0; i < polygon.size(); i++) {
-            Pixel p1 = polygon.get(i);
-            Pixel p2 = polygon.get((i+1) % polygon.size());
-            if (p1.getY() != p2.getY()) {
-                PolygonEdges.add(new PolygonEdge(p1, p2));
+        List<PolygonEdge> edges = new ArrayList<>();
+        for (int i = 0; i < points.size(); i++) {
+            Pixel point1 = points.get(i);
+            Pixel point2 = points.get((i + 1) % points.size()); // Wrap around to the first point
+            if (point1.getY() != point2.getY()) {
+                edges.add(new PolygonEdge(point1, point2));
             }
         }
 
-        PolygonEdges.sort(Comparator.comparingInt(PolygonEdge::getYMin));
+        edges.sort(Comparator.comparingInt(edge -> Math.min(edge.getPoint1().getY(), edge.getPoint2().getY())));
 
-        int yMin = PolygonEdges.get(0).getYMin();
-        int yMax = PolygonEdges.stream().mapToInt(PolygonEdge::getYMax).max().orElse(yMin);
+        List<PolygonEdge> ael = new ArrayList<>();
+        int currentY = minY;
 
-        List<PolygonEdge> activePolygonEdges = new ArrayList<>();
-
-        for (int y = yMin; y <= yMax; y++) {
-            while (!PolygonEdges.isEmpty() && PolygonEdges.get(0).getYMin() == y) {
-                activePolygonEdges.add(PolygonEdges.remove(0));
+        while (currentY <= maxY) {
+            // Add edges that start at currentY
+            for (PolygonEdge edge : edges) {
+                if (Math.min(edge.getPoint1().getY(), edge.getPoint2().getY()) == currentY) {
+                    ael.add(edge);
+                }
             }
 
-            activePolygonEdges.sort(Comparator.comparingDouble(PolygonEdge::getX));
+            // Remove edges that have passed the currentY
+            int finalCurrentY = currentY;
+            ael.removeIf(edge -> Math.max(edge.getPoint1().getY(), edge.getPoint2().getY()) <= finalCurrentY);
 
-            for (int i = 0; i < activePolygonEdges.size()-1; i += 2) {
-                int xStart = (int) Math.ceil(activePolygonEdges.get(i).getX());
-                int xEnd = (int) Math.floor(activePolygonEdges.get(i+1).getX());
+            // Sort by x-intercept
+            int finalCurrentY1 = currentY;
+            ael.sort(Comparator.comparingDouble(edge -> edge.getXIntercept(finalCurrentY1)));
+
+            // Fill in the pixels between pairs of edges
+            for (int i = 0; i < ael.size(); i += 2) {
+                PolygonEdge edge1 = ael.get(i);
+                PolygonEdge edge2 = ael.get(i + 1);
+
+                int xStart = (int) edge1.getXIntercept(currentY);
+                int xEnd = (int) edge2.getXIntercept(currentY);
+
                 for (int x = xStart; x <= xEnd; x++) {
-                    filledPixels.add(new Pixel(x, y, "rgba(255,20,147,0.2)"));
+                    filledPoints.add(new Pixel(x, currentY, "rgba(255,20,147,0.2)"));
                 }
             }
 
-            Iterator<PolygonEdge> it = activePolygonEdges.iterator();
-            while (it.hasNext()) {
-                PolygonEdge polygonEdge = it.next();
-                if (polygonEdge.getYMax() == y) {
-                    it.remove();
-                } else {
-                    polygonEdge.setX(polygonEdge.getX()+ polygonEdge.getDxPerY());
-                }
-            }
+            currentY++;
         }
-        return filledPixels;
+
+        return filledPoints;
     }
 
-    public List<Pixel> floodFill(Pixel seed, List<Pixel> polygon, String fillColor, String boundaryColor) {
+    //Простой алгоритм заполнения с затравкой
+    /**
+     * Алгоритм:
+     * 1. Проверяем, находится ли пиксель в пределах экрана и не был ли он уже обработан.
+     * 2. Если пиксель является границей или его цвет не совпадает с целевым, пропускаем его.
+     * 3. Заполняем пиксель и добавляем его соседей в стек для дальнейшей обработки.
+     */
+    public List<Pixel> floodFill(Pixel seed, List<Pixel> polygon, String boundaryColor) {
         List<Pixel> filledPixels = new ArrayList<>();
         boolean[][] visited = new boolean[SCREEN_WIDTH][SCREEN_HEIGHT];
         Stack<Pixel> stack = new Stack<>();
 
         // Исходный цвет, который будем заменять
         String targetColor = seed.getColor();
+        String fillColor = "rgba(115,255,136,0.2)";
         stack.push(seed);
 
         while (!stack.isEmpty()) {
@@ -278,13 +321,21 @@ public class PolygonService {
         return filledPixels;
     }
 
-    public List<Pixel> scanlineFloodFill(Pixel seed, List<Pixel> polygon, String fillColor, String boundaryColor) {
+    //Построчный алгоритм заполнения с затравкой
+    /**
+     * Алгоритм:
+     * 1. Находим интервал на текущей строке, который нужно заполнить.
+     * 2. Заполняем интервал и проверяем соседние строки (выше и ниже) для каждого пикселя заполненного интервала.
+     * 3. Добавляем новые интервалы в стек для дальнейшей обработки.
+     */
+    public List<Pixel> scanlineFloodFill(Pixel seed, List<Pixel> polygon, String boundaryColor) {
         List<Pixel> filledPixels = new ArrayList<>();
         boolean[][] visited = new boolean[SCREEN_WIDTH][SCREEN_HEIGHT];
         Stack<Pixel> stack = new Stack<>();
 
         // Определяем исходный цвет, который будем заменять
         String targetColor = seed.getColor();
+        String fillColor = "rgba(105,120,255,0.2)";
         stack.push(seed);
 
         while (!stack.isEmpty()) {

@@ -138,11 +138,11 @@ public class DrawingController {
             case "scanline" ->
                     filledPixels = polygonService.scanlineFill(request.getPolygon());
             case "aet" ->
-                    filledPixels = polygonService.aetFill(request.getPolygon());
+                    filledPixels = polygonService.activeEdgeFill(request.getPolygon());
             case "floodFill" ->
-                    filledPixels = polygonService.floodFill(request.getSeed(), request.getPolygon(), request.getFillColor(), request.getBoundaryColor());
+                    filledPixels = polygonService.floodFill(request.getSeed(), request.getPolygon(), request.getBoundaryColor());
             case "scanlineFloodFill" ->
-                    filledPixels = polygonService.scanlineFloodFill(request.getSeed(), request.getPolygon(), request.getFillColor(), request.getBoundaryColor());
+                    filledPixels = polygonService.scanlineFloodFill(request.getSeed(), request.getPolygon(), request.getBoundaryColor());
             default ->
                     throw new IllegalArgumentException("Unknown fill algorithm: " + request.getAlgorithm());
         }

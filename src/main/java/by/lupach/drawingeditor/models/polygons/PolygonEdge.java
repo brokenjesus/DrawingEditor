@@ -5,21 +5,18 @@ import lombok.Data;
 
 @Data
 public class PolygonEdge {
-    int yMax;
-    int yMin;
-    double x;
-    double dxPerY;
+    private Pixel point1;
+    private Pixel point2;
 
-    public PolygonEdge(Pixel p1, Pixel p2) {
-        if (p1.getY() < p2.getY()) {
-            yMin = p1.getY();
-            yMax = p2.getY();
-            x = p1.getX();
-        } else {
-            yMin = p2.getY();
-            yMax = p1.getY();
-            x = p2.getX();
+    public PolygonEdge(Pixel point1, Pixel point2) {
+        this.point1 = point1;
+        this.point2 = point2;
+    }
+
+    public double getXIntercept(int y) {
+        if (point1.getY() == point2.getY()) {
+            return point1.getX(); // Horizontal line, no need for interpolation
         }
-        dxPerY = (double)(p2.getX() - p1.getX()) / (p2.getY() - p1.getY());
+        return point1.getX() + (double) (y - point1.getY()) * (point2.getX() - point1.getX()) / (point2.getY() - point1.getY());
     }
 }

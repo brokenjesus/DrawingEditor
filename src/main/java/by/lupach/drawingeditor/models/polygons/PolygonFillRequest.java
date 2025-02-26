@@ -9,7 +9,6 @@ import java.util.List;
 public class PolygonFillRequest {
     private List<Pixel> polygon;
     private Pixel seed;
-    private String fillColor;
     private String boundaryColor;
     private String algorithm;
 }
