@@ -27,6 +27,10 @@ public class LineDrawingService {
     }
 
     public List<Pixel> generateBresenhamLine(int x1, int y1, int x2, int y2) {
+        return generateBresenhamLineWithColor(x1, y1, x2, y2, "rgba(0, 0, 0, 255)");
+    }
+
+    public List<Pixel> generateBresenhamLineWithColor(int x1, int y1, int x2, int y2, String color) {
         List<Pixel> pixels = new ArrayList<>();
         int dx = Math.abs(x2 - x1);
         int dy = Math.abs(y2 - y1);
@@ -35,7 +39,7 @@ public class LineDrawingService {
         int err = dx - dy;
 
         while (true) {
-            pixels.add(new Pixel(x1, y1, "rgba(0, 0, 0, 255)"));
+            pixels.add(new Pixel(x1, y1, color));
             if (x1 == x2 && y1 == y2) {
                 break;
             }

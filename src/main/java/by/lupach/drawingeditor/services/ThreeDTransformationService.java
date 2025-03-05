@@ -11,9 +11,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Service
-public class TransformationService {
+public class ThreeDTransformationService {
 
-    // Размер canvas и масштаб (аналог Swing‑приложения)
     private final int canvasWidth = 800;
     private final int canvasHeight = 600;
     private final double scale = 100.0;
@@ -21,11 +20,9 @@ public class TransformationService {
     @Autowired
     private LineDrawingService lineDrawingService;
 
-    // Текущая матрица преобразования (аккумулируется между запросами)
     private double[][] currentMatrix = Matrix4f.identity();
 
     public TransformationResponse applyTransformation(TransformationRequest request) {
-        // Создаём матрицу для текущей операции
         double[][] newTransform = Matrix4f.identity();
         switch (request.getTransformationType()) {
             case "translation":
@@ -47,13 +44,10 @@ public class TransformationService {
                 // Если тип не определён, можно оставить матрицу без изменений
                 break;
         }
-        // Обновляем текущую матрицу (накопительно: новое преобразование умножается слева)
         currentMatrix = Matrix4f.multiply(newTransform, currentMatrix);
 
-        // Преобразуем вершины, переданные в запросе, с использованием обновлённой матрицы
         double[][] transformedVertices = transform(request.getVertices(), currentMatrix);
 
-        // Вычисляем пиксели для всех рёбер
         List<Pixel> pixels = new ArrayList<>();
         for (int[] edge : request.getEdges()) {
             double[] v0 = transformedVertices[edge[0]];
@@ -65,11 +59,9 @@ public class TransformationService {
             int x1 = (int) (canvasWidth / 2 + v1[0] * scale);
             int y1 = (int) (canvasHeight / 2 - v1[1] * scale);
 
-            // Добавляем пиксели линии (алгоритм Брезенхема)
             pixels.addAll(lineDrawingService.generateBresenhamLine(x0, y0, x1, y1));
         }
 
-        // Возвращаем ответ с пикселями и текущей матрицей
         return new TransformationResponse(pixels, currentMatrix);
     }
 
@@ -77,8 +69,7 @@ public class TransformationService {
         double[][] result = new double[points.length][4];
         for (int i = 0; i < points.length; i++) {
             result[i] = Matrix4f.multiply(matrix, points[i]);
-            // Перспективное деление
-            if (result[i][3] != 0) {
+                if (result[i][3] != 0) {
                 result[i][0] /= result[i][3];
                 result[i][1] /= result[i][3];
                 result[i][2] /= result[i][3];

@@ -216,7 +216,7 @@ const drawingEditor = {
             document.getElementById('instruction').innerText = `Добавлено точек: ${this.polygonPoints.length}`;
         } else if (this.activeTab === 'voronoi') {
             this.voronoiPoints.push({x, y});
-            this.context.fillStyle = "rgba(0, 255, 0, 0.2)";
+            this.context.fillStyle = "rgba(255,0, 0, 1)";
             this.context.beginPath();
             this.context.arc(x, y, 3, 0, 2 * Math.PI);
             this.context.fill();

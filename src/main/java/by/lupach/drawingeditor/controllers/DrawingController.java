@@ -20,20 +20,20 @@ public class DrawingController {
 
     private final LineDrawingService lineDrawingService;
     private final CurveDrawingService curveDrawingService;
-    private final TransformationService transformationService;
+    private final ThreeDTransformationService threeDTransformationService;
     private final CurveInterpolationAndApproximation interpolationService;
     private final PolygonService polygonService;
     private final VoronoiDiagramService voronoiDiagramService;
     private final SimpMessagingTemplate messagingTemplate;
 
     public DrawingController(LineDrawingService lineDrawingService,
-                             CurveDrawingService curveDrawingService, TransformationService transformationService,
+                             CurveDrawingService curveDrawingService, ThreeDTransformationService threeDTransformationService,
                              CurveInterpolationAndApproximation interpolationService,
                              PolygonService polygonService, VoronoiDiagramService voronoiDiagramService, // Добавлен сервис для работы с полигонами
                              SimpMessagingTemplate messagingTemplate) {
         this.lineDrawingService = lineDrawingService;
         this.curveDrawingService = curveDrawingService;
-        this.transformationService = transformationService;
+        this.threeDTransformationService = threeDTransformationService;
         this.interpolationService = interpolationService;
         this.polygonService = polygonService; // Инициализация сервиса для работы с полигонами
         this.voronoiDiagramService = voronoiDiagramService;
@@ -100,7 +100,7 @@ public class DrawingController {
 
     @MessageMapping("/transform3D")
     public void handleTransformation(TransformationRequest request) {
-        TransformationResponse response = transformationService.applyTransformation(request);
+        TransformationResponse response = threeDTransformationService.applyTransformation(request);
         messagingTemplate.convertAndSend("/topic/drawings3d", response);
     }
 
@@ -152,7 +152,7 @@ public class DrawingController {
 
     @MessageMapping("/voronoiDiagram")
     public void delaunayTriangulator(@RequestBody List<Pixel> request) {
-        List<Pixel> response = VoronoiDiagramService.buildVoronoiDiagram(request, lineDrawingService);
+        List<Pixel> response = voronoiDiagramService.buildVoronoiDiagram(request);
 
         messagingTemplate.convertAndSend("/topic/drawings", response);
     }
